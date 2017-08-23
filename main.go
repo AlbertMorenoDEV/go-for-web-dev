@@ -3,38 +3,39 @@ package main
 import (
 	"net/http"
 
-  "database/sql"
-  _ "github.com/mattn/go-sqlite3"
+	"database/sql"
+
+	_ "github.com/mattn/go-sqlite3"
 	"gopkg.in/gorp.v1"
 
 	"encoding/json"
-	"net/url"
-	"io/ioutil"
 	"encoding/xml"
+	"io/ioutil"
+	"net/url"
 	"strconv"
 
+	gmux "github.com/gorilla/mux"
 	"github.com/urfave/negroni"
 	"github.com/yosssi/ace"
-	gmux "github.com/gorilla/mux"
 )
 
 type Book struct {
-	PK int64 `db:"pk"`
-	Title string `db:"title"`
-	Author string `db:"author"`
+	PK             int64  `db:"pk"`
+	Title          string `db:"title"`
+	Author         string `db:"author"`
 	Classification string `db:"classification"`
-	ID string `db:"id"`
+	ID             string `db:"id"`
 }
 
 type Page struct {
-  Books []Book
+	Books []Book
 }
 
 type SearchResult struct {
-	Title string `xml:"title,attr"`
+	Title  string `xml:"title,attr"`
 	Author string `xml:"author,attr"`
-	Year string `xml:"hyr,attr"`
-	ID string `xml:"owi,attr"`
+	Year   string `xml:"hyr,attr"`
+	ID     string `xml:"owi,attr"`
 }
 
 var db *sql.DB
@@ -58,9 +59,20 @@ func verifyDatabes(w http.ResponseWriter, r *http.Request, next http.HandlerFunc
 }
 
 func main() {
-  initDb()
+	initDb()
 
 	mux := gmux.NewRouter()
+
+	mux.HandleFunc("/books", func(w http.ResponseWriter, r *http.Request) {
+		columnName := r.FormValue("sortBy")
+		if columnName != "title" && columnName != "author" && columnName != "classification" {
+			http.Error(w, "Invalid column name", http.StatusBadRequest)
+			return
+		}
+
+		var b []Book
+		dbmap.Select(&b, "select * froom books order by "+columnName)
+	}).Methods("GET")
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		template, err := ace.Load("templates/index", "", nil)
@@ -68,15 +80,15 @@ func main() {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-    p := Page{Books: []Book{}}
+		p := Page{Books: []Book{}}
 		if _, err = dbmap.Select(&p.Books, "select * from books"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-    if err = template.Execute(w, p); err != nil {
-      http.Error(w, err.Error(), http.StatusInternalServerError)
-    }
+		if err = template.Execute(w, p); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}).Methods("GET")
 
 	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
@@ -103,9 +115,9 @@ func main() {
 		}
 
 		b := Book{
-			PK: -1,
-			Title: book.BookData.Title,
-			Author: book.BookData.Author,
+			PK:             -1,
+			Title:          book.BookData.Title,
+			Author:         book.BookData.Author,
 			Classification: book.Classification.MostPopular,
 		}
 		if err = dbmap.Insert(&b); err != nil {
@@ -118,7 +130,7 @@ func main() {
 		}
 	}).Methods("PUT")
 
-	mux.HandleFunc("/books/{pk}", func (w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/books/{pk}", func(w http.ResponseWriter, r *http.Request) {
 		pk, _ := strconv.ParseInt(gmux.Vars(r)["pk"], 10, 64)
 		if _, err := dbmap.Delete(&Book{pk, "", "", "", ""}); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -140,9 +152,9 @@ type ClassifySearchResponse struct {
 
 type ClassifyBookResponse struct {
 	BookData struct {
-		Title string `xml:"title,attr"`
+		Title  string `xml:"title,attr"`
 		Author string `xml:"author,attr"`
-		ID string `xml:"owi,attr"`
+		ID     string `xml:"owi,attr"`
 	} `xml:"work"`
 	Classification struct {
 		MostPopular string `xml:"sfa,attr"`
