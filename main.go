@@ -16,8 +16,8 @@ import (
 
 	gmux "github.com/gorilla/mux"
 	"github.com/urfave/negroni"
-	"github.com/GoIncremental/negroni-sessions"
-	"github.com/GoIncremental/negroni-sessions/cookiestore"
+	"github.com/goincremental/negroni-sessions"
+	"github.com/goincremental/negroni-sessions/cookiestore"
 	"github.com/yosssi/ace"
 )
 
