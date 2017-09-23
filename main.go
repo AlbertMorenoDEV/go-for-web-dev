@@ -10,7 +10,6 @@ import (
 
 	"encoding/json"
 	"encoding/xml"
-	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"
 	"net/url"
 	"strconv"
@@ -20,6 +19,7 @@ import (
 	gmux "github.com/gorilla/mux"
 	"github.com/urfave/negroni"
 	"github.com/yosssi/ace"
+	"github.com/AlbertMorenoDEV/go-for-web-dev/models"
 )
 
 type Book struct {
@@ -29,11 +29,6 @@ type Book struct {
 	Classification string `db:"classification"`
 	ID             string `db:"id"`
 	User           string `db:"user"`
-}
-
-type User struct {
-	Username string `db:"username"`
-	Secret   []byte `db:"secret"`
 }
 
 type Page struct {
@@ -58,7 +53,7 @@ func initDb() {
 	dbmap = &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}
 
 	dbmap.AddTableWithName(Book{}, "books").SetKeys(true, "pk")
-	dbmap.AddTableWithName(User{}, "users").SetKeys(false, "username")
+	dbmap.AddTableWithName(models.User{}, "users").SetKeys(false, "username")
 	dbmap.CreateTablesIfNotExists()
 }
 
@@ -104,7 +99,7 @@ func verifyUser(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	}
 
 	if username := getStringFromSession(r, "User"); username != "" {
-		if user, _ := dbmap.Get(User{}, username); user != nil {
+		if user, _ := dbmap.Get(models.User{}, username); user != nil {
 			next(w, r)
 			return
 		}
@@ -124,9 +119,8 @@ func main() {
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		var p LoginPage
 		if r.FormValue("register") != "" {
-			secret, _ := bcrypt.GenerateFromPassword([]byte(r.FormValue("password")), bcrypt.DefaultCost)
-			user := User{r.FormValue("username"), secret}
-			if err := dbmap.Insert(&user); err != nil {
+			user := models.NewUser(r.FormValue("username"), r.FormValue("password"))
+			if err := dbmap.Insert(user); err != nil {
 				p.Error = err.Error()
 			} else {
 				sessions.GetSession(r).Set("User", user.Username)
@@ -134,14 +128,14 @@ func main() {
 				return
 			}
 		} else if r.FormValue("login") != "" {
-			user, err := dbmap.Get(User{}, r.FormValue("username"))
+			user, err := dbmap.Get(models.User{}, r.FormValue("username"))
 			if err != nil {
 				p.Error = err.Error()
 			} else if user == nil {
 				p.Error = "No such user found with Username: " + r.FormValue("username")
 			} else {
-				u := user.(*User)
-				if err = bcrypt.CompareHashAndPassword(u.Secret, []byte(r.FormValue("password"))); err != nil {
+				u := user.(*models.User)
+				if !u.Authenticate(r.FormValue("password")) {
 					p.Error = err.Error()
 				} else {
 					sessions.GetSession(r).Set("User", u.Username)
