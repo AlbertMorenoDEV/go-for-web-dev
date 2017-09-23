@@ -10,15 +10,15 @@ import (
 
 	"encoding/json"
 	"encoding/xml"
+	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"
 	"net/url"
 	"strconv"
-	"golang.org/x/crypto/bcrypt"
 
-	gmux "github.com/gorilla/mux"
-	"github.com/urfave/negroni"
 	"github.com/goincremental/negroni-sessions"
 	"github.com/goincremental/negroni-sessions/cookiestore"
+	gmux "github.com/gorilla/mux"
+	"github.com/urfave/negroni"
 	"github.com/yosssi/ace"
 )
 
@@ -33,13 +33,13 @@ type Book struct {
 
 type User struct {
 	Username string `db:"username"`
-	Secret []byte `db:"secret"`
+	Secret   []byte `db:"secret"`
 }
 
 type Page struct {
-	Books []Book
+	Books  []Book
 	Filter string
-	User string
+	User   string
 }
 
 type SearchResult struct {
@@ -81,7 +81,7 @@ func getBookCollection(books *[]Book, sortCol, filterByClass, username string, w
 		where = " and classification not between '800' and '900'"
 	}
 
-	if _, err := dbmap.Select(books, "select * from books" + where + " order by "+sortCol, username); err != nil {
+	if _, err := dbmap.Select(books, "select * from books"+where+" order by "+sortCol, username); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return false
 	}
@@ -121,7 +121,7 @@ func main() {
 
 	mux := gmux.NewRouter()
 
-	mux.HandleFunc("/login", func (w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		var p LoginPage
 		if r.FormValue("register") != "" {
 			secret, _ := bcrypt.GenerateFromPassword([]byte(r.FormValue("password")), bcrypt.DefaultCost)
@@ -162,7 +162,7 @@ func main() {
 		}
 	})
 
-	mux.HandleFunc("/logout", func (w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
 		sessions.GetSession(r).Set("User", nil)
 		sessions.GetSession(r).Set("Filter", nil)
 
@@ -171,7 +171,7 @@ func main() {
 
 	mux.HandleFunc("/books", func(w http.ResponseWriter, r *http.Request) {
 		var b []Book
-		if !getBookCollection(&b, getStringFromSession(r,"sortBy"), r.FormValue("filter"), getStringFromSession(r, "User"), w) {
+		if !getBookCollection(&b, getStringFromSession(r, "sortBy"), r.FormValue("filter"), getStringFromSession(r, "User"), w) {
 			return
 		}
 
@@ -204,7 +204,7 @@ func main() {
 		}
 
 		p := Page{Books: []Book{}, Filter: getStringFromSession(r, "Filter"), User: getStringFromSession(r, "User")}
-		if !getBookCollection(&p.Books, getStringFromSession(r,"SortBy"), getStringFromSession(r, "Filter"), p.User, w) {
+		if !getBookCollection(&p.Books, getStringFromSession(r, "SortBy"), getStringFromSession(r, "Filter"), p.User, w) {
 			return
 		}
 
@@ -241,8 +241,8 @@ func main() {
 			Title:          book.BookData.Title,
 			Author:         book.BookData.Author,
 			Classification: book.Classification.MostPopular,
-			ID: r.FormValue("id"),
-			User: getStringFromSession(r, "User"),
+			ID:             r.FormValue("id"),
+			User:           getStringFromSession(r, "User"),
 		}
 		if err = dbmap.Insert(&b); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
